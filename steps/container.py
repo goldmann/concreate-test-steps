@@ -22,15 +22,26 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.mgb
 """
 from __future__ import print_function
-import docker
 import json
 import logging
 import os
 import re
 import time
 
-d = docker.Client(version="1.22")
+# First try to import Docker client using the API
+# available in version 2 of the library and fall
+# back to version 1
 
+try:
+    from docker.api.client import APIClient as APIClientClass
+    docker_api = 2
+except ImportError:
+    from docker.client import Client as APIClientClass
+    docker_api = 1
+
+import docker
+
+d = APIClientClass(version="1.22")
 
 class ExecException(Exception):
     def __init__(self, message, output=None):
@@ -113,19 +124,21 @@ class Container(object):
 
         self.logging.debug("Creating container from image '%s'..." % self.image_id)
 
-        # we need to split kwargs to the args with belongs to create_host_config and
-        # create_container - be aware - this moved to differnet place for new docker
-        # python API
-        host_c_args_names = docker.utils.utils.create_host_config.__code__.co_varnames
-        for arg in host_c_args_names:
-            if arg in kwargs:
-                host_args[arg]=kwargs.pop(arg)
+        if docker_api == 2:
+            # we need to split kwargs to the args with belongs to create_host_config and
+            # create_container - be aware - this moved to differnet place for new docker
+            # python API
+            host_c_args_names = docker.utils.utils.create_host_config.__code__.co_varnames
+            for arg in host_c_args_names:
+                if arg in kwargs:
+                    host_args[arg]=kwargs.pop(arg)
 
         self.container = d.create_container(image=self.image_id,
                                             detach=True,
                                             volumes=volume_mount_points,
                                             host_config=d.create_host_config(**host_args),
                                             **kwargs)
+
         self.logging.debug("Starting container '%s'..." % self.container.get('Id'))
         d.start(container=self.container)
         self.running = True

@@ -1,10 +1,18 @@
-import docker
 import logging
 
 from behave import when, then, given
 from container import Container, ExecException
 
-DOCKER_CLIENT = docker.Client(version="1.22")
+# First try to import Docker client using the API
+# available in version 2 of the library and fall
+# back to version 1
+try:
+    from docker.api.client import APIClient as APIClientClass
+except ImportError:
+    from docker.client import Client as APIClientClass
+
+DOCKER_CLIENT = APIClientClass(version="1.22")
+
 LOG_FORMAT='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 logging.basicConfig(format=LOG_FORMAT)
 
